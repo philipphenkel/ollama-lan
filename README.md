@@ -51,6 +51,31 @@ Default bind: `0.0.0.0:11440`
 
 ---
 
+## Linux Install (systemd)
+
+Install via one-liner (downloads from GitHub, installs to `/opt/ollama-lan`, creates a systemd service):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/philipphenkel/ollama-lan/main/scripts/install.sh | sh
+```
+
+Customize with environment variables:
+
+```bash
+OLLAMA_LAN_BASE_URL=http://192.168.1.20:11434 \
+OLLAMA_LAN_PORT=11440 \
+OLLAMA_LAN_MODEL=gpt-oss:20b \
+curl -fsSL https://raw.githubusercontent.com/philipphenkel/ollama-lan/main/scripts/install.sh | sh
+```
+
+Uninstall:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/philipphenkel/ollama-lan/main/scripts/uninstall.sh | sh
+```
+
+---
+
 ## Command Line Options
 
 | Option | Default | Description |
