@@ -86,12 +86,22 @@ fi
 run_as_user "\"$OLLAMA_LAN_DIR/.venv/bin/pip\" install -r \"$OLLAMA_LAN_DIR/requirements.txt\""
 
 if command -v systemctl >/dev/null 2>&1; then
-  exec_args="--host ${OLLAMA_LAN_HOST} --port ${OLLAMA_LAN_PORT} --ollama-base-url ${OLLAMA_LAN_BASE_URL}"
+  sd_quote() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    printf '"%s"' "$value"
+  }
+
+  exec_line="ExecStart=${OLLAMA_LAN_DIR}/.venv/bin/python ${OLLAMA_LAN_DIR}/ollama-lan.py"
+  exec_line="${exec_line} --host $(sd_quote "${OLLAMA_LAN_HOST}")"
+  exec_line="${exec_line} --port $(sd_quote "${OLLAMA_LAN_PORT}")"
+  exec_line="${exec_line} --ollama-base-url $(sd_quote "${OLLAMA_LAN_BASE_URL}")"
   if [ -n "${OLLAMA_LAN_MODEL:-}" ]; then
-    exec_args="${exec_args} --model ${OLLAMA_LAN_MODEL}"
+    exec_line="${exec_line} --model $(sd_quote "${OLLAMA_LAN_MODEL}")"
   fi
   case "${OLLAMA_LAN_SHARE:-false}" in
-    1|true|TRUE|yes|YES) exec_args="${exec_args} --share" ;;
+    1|true|TRUE|yes|YES) exec_line="${exec_line} --share" ;;
   esac
 
   cat <<EOF | $SUDO tee /etc/systemd/system/ollama-lan.service >/dev/null
@@ -105,7 +115,7 @@ Type=simple
 User=${OLLAMA_LAN_USER}
 Group=${OLLAMA_LAN_GROUP}
 WorkingDirectory=${OLLAMA_LAN_DIR}
-ExecStart=${OLLAMA_LAN_DIR}/.venv/bin/python ${OLLAMA_LAN_DIR}/ollama-lan.py ${exec_args}
+${exec_line}
 Restart=on-failure
 RestartSec=2
 
