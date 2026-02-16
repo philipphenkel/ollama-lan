@@ -24,7 +24,7 @@ OLLAMA_LAN_DIR="${OLLAMA_LAN_DIR:-/opt/ollama-lan}"
 
 if command -v systemctl >/dev/null 2>&1; then
   if systemctl list-unit-files | grep -q "^ollama-lan.service"; then
-    $SUDO systemctl stop ollama-lan || true
+    $SUDO systemctl kill ollama-lan || true
     $SUDO systemctl disable ollama-lan || true
     $SUDO systemctl daemon-reload
   fi
