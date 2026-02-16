@@ -324,8 +324,7 @@ def build_app(
 ) -> gr.Blocks:
     css = ".prompt-row { align-items: center; }"
     with gr.Blocks(title=APP_TITLE, css=css) as app:
-        ollama_base_url = gr.State(normalize_base_url(base_url))
-        startup_model = gr.State(model)
+        ollama_base_url_state = gr.State(normalize_base_url(base_url))
         model_map_state = gr.State({})
         ui_history_state = gr.State([])
         api_history_state = gr.State([])
@@ -352,7 +351,7 @@ def build_app(
 
         app.load(
             fn=refresh_models,
-            inputs=[ollama_base_url, startup_model],
+            inputs=[ollama_base_url_state, model],
             outputs=[model, model_info, model_map_state, headline],
         )
         model.change(
@@ -364,7 +363,7 @@ def build_app(
         def bind_send(event):
             event(
                 fn=stream_chat,
-                inputs=[prompt, ui_history_state, api_history_state, ollama_base_url, model, model_map_state],
+                inputs=[prompt, ui_history_state, api_history_state, ollama_base_url_state, model, model_map_state],
                 outputs=[chat, ui_history_state, api_history_state, headline, metrics, model_info, model_map_state],
             ).then(
                 fn=lambda: "",
