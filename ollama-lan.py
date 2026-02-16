@@ -211,12 +211,11 @@ def stream_chat(
     model_map = model_map or {}
     model_info = build_model_info(model, model_map)
 
-    if not message.strip():
-        yield clean_ui, clean_ui, clean_api, header_text(STATUS_READY), NO_METRICS_TEXT, model_info, model_map
-        return
+    def emit(history, api, status, metrics=NO_METRICS_TEXT):
+        return history, history, api, header_text(status), metrics, model_info, model_map
 
-    if not model:
-        yield clean_ui, clean_ui, clean_api, header_text(STATUS_READY), NO_METRICS_TEXT, model_info, model_map
+    if not message.strip() or not model:
+        yield emit(clean_ui, clean_api, STATUS_READY)
         return
 
     normalized = normalize_base_url(base_url)
@@ -226,15 +225,7 @@ def stream_chat(
         {"role": "user", "content": message},
         {"role": "assistant", "content": ""},
     ]
-    yield (
-        display_history,
-        display_history,
-        clean_api,
-        header_text(STATUS_GENERATING),
-        NO_METRICS_TEXT,
-        model_info,
-        model_map,
-    )
+    yield emit(display_history, clean_api, STATUS_GENERATING)
 
     payload = {
         "model": model,
@@ -276,46 +267,29 @@ def stream_chat(
                         display_history[-1] = {"role": "assistant", "content": text}
                         last_ui_emit = now
                         last_ui_len = len(text)
-                        yield (
-                            display_history,
-                            display_history,
-                            clean_api,
-                            header_text(status_key),
-                            NO_METRICS_TEXT,
-                            model_info,
-                            model_map,
-                        )
+                        yield emit(display_history, clean_api, status_key)
 
                 if event.get("done"):
                     final_meta = event
                     break
     except (requests.RequestException, json.JSONDecodeError) as exc:
         display_history[-1] = {"role": "assistant", "content": f"[Error] {exc}"}
-        yield (
-            display_history,
-            display_history,
-            clean_api,
-            header_text(STATUS_ERROR),
-            NO_METRICS_TEXT,
-            model_info,
-            model_map,
-        )
+        yield emit(display_history, clean_api, STATUS_ERROR)
         return
 
     metrics = format_metrics(final_meta) if final_meta else "No metrics returned by Ollama."
     ps_entry = fetch_ps_entry(normalized, model)
     if ps_entry:
         entry = dict(model_map.get(model) or {})
-        if ps_entry.get("context_length"):
-            entry["context_length"] = ps_entry.get("context_length")
-        if ps_entry.get("size_vram"):
-            entry["size_vram"] = ps_entry.get("size_vram")
+        for key in ("context_length", "size_vram"):
+            if ps_entry.get(key):
+                entry[key] = ps_entry.get(key)
         if entry:
             model_map[model] = entry
             model_info = build_model_info(model, model_map)
     display_history[-1] = {"role": "assistant", "content": render_assistant_text(text)}
     updated_api = request_messages + [{"role": "assistant", "content": text}]
-    yield display_history, display_history, updated_api, header_text(STATUS_READY), metrics, model_info, model_map
+    yield emit(display_history, updated_api, STATUS_READY, metrics)
 
 
 def build_app(
@@ -325,6 +299,7 @@ def build_app(
     css = ".prompt-row { align-items: center; }"
     with gr.Blocks(title=APP_TITLE, css=css) as app:
         ollama_base_url_state = gr.State(normalize_base_url(base_url))
+        startup_model_state = gr.State(model)
         model_map_state = gr.State({})
         ui_history_state = gr.State([])
         api_history_state = gr.State([])
@@ -347,11 +322,11 @@ def build_app(
                     filterable=False,
                 )
                 model_info = gr.Markdown("### Selected Model\nLoading...")
-                metrics = gr.Markdown("No metrics yet.")
+                metrics = gr.Markdown(NO_METRICS_TEXT)
 
         app.load(
             fn=refresh_models,
-            inputs=[ollama_base_url_state, model],
+            inputs=[ollama_base_url_state, startup_model_state],
             outputs=[model, model_info, model_map_state, headline],
         )
         model.change(
