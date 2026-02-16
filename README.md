@@ -86,8 +86,7 @@ curl -fsSL https://raw.githubusercontent.com/philipphenkel/ollama-lan/main/scrip
 |------|------|------|
 | `--host` | `0.0.0.0` | Web server bind address |
 | `--port` | `11440` | Web UI port |
-| `--share` | off | Gradio public share link |
-| `--ollama-base-url` | `http://localhost:11434` | Ollama API base URL (alias: `--ollama-host`) |
+| `--ollama-base-url` | `http://localhost:11434` | Ollama API base URL |
 | `--model` | auto | Preselect model at startup |
 
 ---
@@ -106,12 +105,6 @@ Connect to remote Ollama server:
 python ollama-lan.py \
   --ollama-base-url http://192.168.1.20:11434 \
   --model gpt-oss:20b
-```
-
-Expose temporary public link:
-
-```bash
-python ollama-lan.py --share
 ```
 
 ---

@@ -8,6 +8,16 @@ import time
 import gradio as gr
 import requests
 
+import os
+
+os.environ["GRADIO_FLAGGING_MODE"] = "never"
+os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
+os.environ["GRADIO_CACHE_EXAMPLES"] = "false"
+os.environ["GRADIO_CHAT_FLAGGING_MODE"] = "never"
+os.environ["GRADIO_VIBE_MODE"] = ""
+os.environ["GRADIO_MCP_SERVER"] = "False"
+os.environ["GRADIO_SHARE"] = "False"
+
 APP_TITLE = "ollama-lan"
 DEFAULT_BASE_URL = "http://localhost:11434"
 TAGS_TIMEOUT_SECONDS = 15
@@ -296,8 +306,7 @@ def build_app(
     base_url: str = DEFAULT_BASE_URL,
     model: str | None = None,
 ) -> gr.Blocks:
-    css = ".prompt-row { align-items: center; }"
-    with gr.Blocks(title=APP_TITLE, css=css) as app:
+    with gr.Blocks(title=APP_TITLE, delete_cache=(60, 60)) as app:
         ollama_base_url_state = gr.State(normalize_base_url(base_url))
         startup_model_state = gr.State(model)
         model_map_state = gr.State({})
@@ -311,7 +320,7 @@ def build_app(
                 with gr.Row(elem_classes=["prompt-row"]):
                     prompt = gr.Textbox(show_label=False, placeholder="Ask something...", scale=40)
                     send = gr.Button("⏎", scale=1, min_width=10)
-                chat = gr.Chatbot(allow_tags=False)
+                chat = gr.Chatbot(allow_tags=False, buttons=['copy', 'copy_all'] )
 
             with gr.Column(scale=1, min_width=280):
                 model = gr.Dropdown(
@@ -362,7 +371,6 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=f"Run {APP_TITLE}.")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind Gradio server to.")
     parser.add_argument("--port", type=int, default=11440, help="Port to bind Gradio server to.")
-    parser.add_argument("--share", action="store_true", help="Enable Gradio share URL.")
     parser.add_argument(
         "--ollama-base-url",
         default=DEFAULT_BASE_URL,
@@ -379,4 +387,10 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = parse_args()
     demo = build_app(base_url=args.ollama_base_url, model=args.model)
-    demo.launch(server_name=args.host, server_port=args.port, share=args.share)
+    demo.launch(
+        server_name=args.host,
+        server_port=args.port,
+        footer_links=["settings"],
+        quiet=True,
+        css=".prompt-row { align-items: center; }"
+    )
