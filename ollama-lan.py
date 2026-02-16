@@ -308,7 +308,8 @@ def build_app(
     base_url: str = DEFAULT_BASE_URL,
     model: str | None = None,
 ) -> gr.Blocks:
-    with gr.Blocks(title=APP_TITLE) as app:
+    css = ".prompt-row { align-items: center; }"
+    with gr.Blocks(title=APP_TITLE, css=css) as app:
         ollama_base_url = gr.State(normalize_base_url(base_url))
         startup_model = gr.State(model)
         model_map_state = gr.State({})
@@ -321,8 +322,9 @@ def build_app(
         with gr.Row():
 
             with gr.Column(scale=3, min_width=480):
-                with gr.Row():
-                    prompt = gr.Textbox(show_label=False, placeholder="Ask something...")
+                with gr.Row(elem_classes=["prompt-row"]):
+                    prompt = gr.Textbox(show_label=False, placeholder="Ask something...", scale=40)
+                    send = gr.Button("⏎", scale=1, min_width=10)
                 chat = gr.Chatbot(allow_tags=False)
 
             with gr.Column(scale=1, min_width=280):
@@ -348,6 +350,15 @@ def build_app(
         )
 
         prompt.submit(
+            fn=stream_chat,
+            inputs=[prompt, ui_history_state, api_history_state, ollama_base_url, model, model_map_state],
+            outputs=[chat, ui_history_state, api_history_state, headline, metrics, model_info, model_map_state],
+        ).then(
+            fn=lambda: "",
+            inputs=[],
+            outputs=[prompt],
+        )
+        send.click(
             fn=stream_chat,
             inputs=[prompt, ui_history_state, api_history_state, ollama_base_url, model, model_map_state],
             outputs=[chat, ui_history_state, api_history_state, headline, metrics, model_info, model_map_state],
