@@ -86,9 +86,12 @@ fi
 run_as_user "\"$OLLAMA_LAN_DIR/.venv/bin/pip\" install -r \"$OLLAMA_LAN_DIR/requirements.txt\""
 
 if command -v systemctl >/dev/null 2>&1; then
-  share_flag=""
+  exec_args="--host ${OLLAMA_LAN_HOST} --port ${OLLAMA_LAN_PORT} --ollama-base-url ${OLLAMA_LAN_BASE_URL}"
+  if [ -n "${OLLAMA_LAN_MODEL:-}" ]; then
+    exec_args="${exec_args} --model ${OLLAMA_LAN_MODEL}"
+  fi
   case "${OLLAMA_LAN_SHARE:-false}" in
-    1|true|TRUE|yes|YES) share_flag="--share" ;;
+    1|true|TRUE|yes|YES) exec_args="${exec_args} --share" ;;
   esac
 
   cat <<EOF | $SUDO tee /etc/systemd/system/ollama-lan.service >/dev/null
@@ -102,12 +105,7 @@ Type=simple
 User=${OLLAMA_LAN_USER}
 Group=${OLLAMA_LAN_GROUP}
 WorkingDirectory=${OLLAMA_LAN_DIR}
-Environment=OLLAMA_LAN_HOST=${OLLAMA_LAN_HOST}
-Environment=OLLAMA_LAN_PORT=${OLLAMA_LAN_PORT}
-Environment=OLLAMA_LAN_BASE_URL=${OLLAMA_LAN_BASE_URL}
-Environment=OLLAMA_LAN_MODEL=${OLLAMA_LAN_MODEL}
-Environment=OLLAMA_LAN_SHARE_FLAG=${share_flag}
-ExecStart=${OLLAMA_LAN_DIR}/.venv/bin/python ${OLLAMA_LAN_DIR}/ollama-lan.py --host \${OLLAMA_LAN_HOST} --port \${OLLAMA_LAN_PORT} --ollama-base-url \${OLLAMA_LAN_BASE_URL} --model \${OLLAMA_LAN_MODEL} \${OLLAMA_LAN_SHARE_FLAG}
+ExecStart=${OLLAMA_LAN_DIR}/.venv/bin/python ${OLLAMA_LAN_DIR}/ollama-lan.py ${exec_args}
 Restart=on-failure
 RestartSec=2
 
