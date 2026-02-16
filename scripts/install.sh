@@ -93,15 +93,15 @@ if command -v systemctl >/dev/null 2>&1; then
     printf '"%s"' "$value"
   }
 
-  exec_line="ExecStart=${OLLAMA_LAN_DIR}/.venv/bin/python ${OLLAMA_LAN_DIR}/ollama-lan.py"
-  exec_line="${exec_line} --host $(sd_quote "${OLLAMA_LAN_HOST}")"
-  exec_line="${exec_line} --port $(sd_quote "${OLLAMA_LAN_PORT}")"
-  exec_line="${exec_line} --ollama-base-url $(sd_quote "${OLLAMA_LAN_BASE_URL}")"
+  exec_line="ExecStart=${OLLAMA_LAN_DIR}/.venv/bin/python ${OLLAMA_LAN_DIR}/ollama-lan.py \\"
+  exec_line="${exec_line}\n  --host $(sd_quote "${OLLAMA_LAN_HOST}") \\"
+  exec_line="${exec_line}\n  --port $(sd_quote "${OLLAMA_LAN_PORT}") \\"
+  exec_line="${exec_line}\n  --ollama-base-url $(sd_quote "${OLLAMA_LAN_BASE_URL}")"
   if [ -n "${OLLAMA_LAN_MODEL:-}" ]; then
-    exec_line="${exec_line} --model $(sd_quote "${OLLAMA_LAN_MODEL}")"
+    exec_line="${exec_line} \\\n  --model $(sd_quote "${OLLAMA_LAN_MODEL}")"
   fi
   case "${OLLAMA_LAN_SHARE:-false}" in
-    1|true|TRUE|yes|YES) exec_line="${exec_line} --share" ;;
+    1|true|TRUE|yes|YES) exec_line="${exec_line} \\\n  --share" ;;
   esac
 
   cat <<EOF | $SUDO tee /etc/systemd/system/ollama-lan.service >/dev/null
