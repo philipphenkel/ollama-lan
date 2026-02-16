@@ -5,6 +5,8 @@ Lightweight LAN chat UI to access your models from any device in your local netw
 
 This is a minimal single-file Gradio UI for Ollama (~400 lines), designed to stay readable, hackable, and easy to embed into other setups.
 
+![screenshot](screenshot.png)
+
 Features:
 
 - Chat conversation UI
