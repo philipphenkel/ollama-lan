@@ -305,12 +305,12 @@ def stream_chat(
 
 
 def build_app(
-    initial_base_url: str = DEFAULT_BASE_URL,
-    initial_model: str | None = None,
+    base_url: str = DEFAULT_BASE_URL,
+    model: str | None = None,
 ) -> gr.Blocks:
     with gr.Blocks(title=APP_TITLE) as app:
-        base_url_state = gr.State(normalize_base_url(initial_base_url))
-        startup_model_state = gr.State(initial_model)
+        ollama_base_url = gr.State(normalize_base_url(base_url))
+        startup_model = gr.State(model)
         model_map_state = gr.State({})
         ui_history_state = gr.State([])
         api_history_state = gr.State([])
@@ -327,7 +327,7 @@ def build_app(
 
             with gr.Column(scale=1, min_width=280):
                 model = gr.Dropdown(
-                    label=f"Models at {normalize_base_url(initial_base_url)}",
+                    label=f"Models at {normalize_base_url(base_url)}",
                     choices=[],
                     value=None,
                     allow_custom_value=False,
@@ -338,7 +338,7 @@ def build_app(
 
         app.load(
             fn=refresh_models,
-            inputs=[base_url_state, startup_model_state],
+            inputs=[ollama_base_url, startup_model],
             outputs=[model, model_info, model_map_state, headline],
         )
         model.change(
@@ -349,7 +349,7 @@ def build_app(
 
         prompt.submit(
             fn=stream_chat,
-            inputs=[prompt, ui_history_state, api_history_state, base_url_state, model, model_map_state],
+            inputs=[prompt, ui_history_state, api_history_state, ollama_base_url, model, model_map_state],
             outputs=[chat, ui_history_state, api_history_state, headline, metrics, model_info, model_map_state],
         ).then(
             fn=lambda: "",
@@ -386,5 +386,5 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
-    demo = build_app(initial_base_url=args.ollama_base_url, initial_model=args.model)
+    demo = build_app(base_url=args.ollama_base_url, model=args.model)
     demo.launch(server_name=args.host, server_port=args.port, share=args.share)
