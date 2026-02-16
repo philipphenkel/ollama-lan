@@ -58,7 +58,7 @@ Default bind: `0.0.0.0:11440`
 | `--host` | `0.0.0.0` | Web server bind address |
 | `--port` | `11440` | Web UI port |
 | `--share` | off | Gradio public share link |
-| `--ollama-host` | `http://localhost:11434` | Ollama API base URL |
+| `--ollama-base-url` | `http://localhost:11434` | Ollama API base URL (alias: `--ollama-host`) |
 | `--model` | auto | Preselect model at startup |
 
 ---
@@ -75,7 +75,7 @@ Connect to remote Ollama server:
 
 ```bash
 python ollama-lan.py \
-  --ollama-host http://192.168.1.20:11434 \
+  --ollama-base-url http://192.168.1.20:11434 \
   --model gpt-oss:20b
 ```
 

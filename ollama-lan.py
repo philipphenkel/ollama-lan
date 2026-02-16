@@ -29,7 +29,7 @@ def status_text(status: str) -> str:
         STATUS_READY: "🟢 Ready",
         STATUS_GENERATING: "✍ Generating",
         STATUS_THINKING: " 🧠 Thinking",
-        STATUS_ERROR: "⚠️ Ollama host unreachable",
+        STATUS_ERROR: "⚠️ Ollama unreachable",
     }.get(status, "🟢 Ready")
     return text
 
@@ -372,7 +372,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=11440, help="Port to bind Gradio server to.")
     parser.add_argument("--share", action="store_true", help="Enable Gradio share URL.")
     parser.add_argument(
-        "--ollama-host",
+        "--ollama-base-url",
         default=DEFAULT_BASE_URL,
         help="Ollama base URL (example: http://localhost:11434).",
     )
@@ -386,5 +386,5 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
-    demo = build_app(initial_base_url=args.ollama_host, initial_model=args.model)
+    demo = build_app(initial_base_url=args.ollama_base_url, initial_model=args.model)
     demo.launch(server_name=args.host, server_port=args.port, share=args.share)
