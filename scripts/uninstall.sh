@@ -21,17 +21,25 @@ else
 fi
 
 OLLAMA_LAN_DIR="${OLLAMA_LAN_DIR:-/opt/ollama-lan}"
+UNIT="ollama-lan.service"
 
 if command -v systemctl >/dev/null 2>&1; then
-  if systemctl list-unit-files | grep -q "^ollama-lan.service"; then
-    $SUDO systemctl kill ollama-lan || true
-    $SUDO systemctl disable ollama-lan || true
-    $SUDO systemctl daemon-reload
-  fi
+  # Stop + disable (works even if already stopped/disabled)
+  $SUDO systemctl disable --now "$UNIT" 2>/dev/null || true
+
+  # Ensure no processes remain in the unit's cgroup (important with Restart=on-failure)
+  $SUDO systemctl kill --kill-who=all "$UNIT" 2>/dev/null || true
+  $SUDO systemctl reset-failed "$UNIT" 2>/dev/null || true
 fi
 
-$SUDO rm -f /etc/systemd/system/ollama-lan.service
+# Remove unit + binaries
+$SUDO rm -f /etc/systemd/system/"$UNIT"
 $SUDO rm -f /usr/local/bin/ollama-lan
 $SUDO rm -rf "$OLLAMA_LAN_DIR"
+
+# Now reload so systemd forgets the removed unit file
+if command -v systemctl >/dev/null 2>&1; then
+  $SUDO systemctl daemon-reload 2>/dev/null || true
+fi
 
 echo "Uninstall complete."
