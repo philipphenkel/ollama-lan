@@ -142,8 +142,12 @@ EOF
   } | $SUDO tee /etc/systemd/system/ollama-lan.service >/dev/null
 
   $SUDO systemctl daemon-reload
-  $SUDO systemctl enable --now ollama-lan
-  echo "Installed and started systemd service: ollama-lan"
+  if $SUDO systemctl is-enabled --quiet ollama-lan; then
+    $SUDO systemctl restart ollama-lan
+  else
+    $SUDO systemctl enable --now ollama-lan
+  fi
+  echo "Installed and (re)started systemd service: ollama-lan"
 else
   echo "systemd not found. Run manually: /usr/local/bin/ollama-lan"
 fi
