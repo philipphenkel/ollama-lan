@@ -379,7 +379,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         default=None,
-        help="Model name to preselect at startup (example: llama3.2).",
+        help="Model name to preselect at startup (example: gpt-oss:20b).",
     )
     return parser.parse_args()
 
