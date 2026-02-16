@@ -20,42 +20,41 @@ STATUS_READY = "ready"
 STATUS_GENERATING = "gen"
 STATUS_THINKING = "think"
 STATUS_ERROR = "err"
+NO_METRICS_TEXT = "No metrics yet."
+
+STATUS_TEXT = {
+    STATUS_READY: "🟢 Ready",
+    STATUS_GENERATING: "✍ Generating",
+    STATUS_THINKING: "🧠 Thinking",
+    STATUS_ERROR: "⚠️ Ollama unreachable",
+}
+
+BLOCK_MATH_PATTERN = re.compile(r"(?ms)(^|\n)\s*\\?\[\s*\n(.*?)\n\s*\\?\]\s*(?=\n|$)")
+INLINE_MATH_PATTERN = re.compile(r"\[\s*([^\[\]\n]*[=\\^_][^\[\]\n]*)\s*\]")
 
 def header_text(status: str) -> str:
     return f"## {APP_TITLE} ㅤ {status_text(status)}"
 
 def status_text(status: str) -> str:
-    text = {
-        STATUS_READY: "🟢 Ready",
-        STATUS_GENERATING: "✍ Generating",
-        STATUS_THINKING: " 🧠 Thinking",
-        STATUS_ERROR: "⚠️ Ollama unreachable",
-    }.get(status, "🟢 Ready")
-    return text
+    return STATUS_TEXT.get(status, STATUS_TEXT[STATUS_READY])
 
 
 def normalize_base_url(base_url: str) -> str:
     url = (base_url or DEFAULT_BASE_URL).strip()
-    if not url:
-        url = DEFAULT_BASE_URL
     return url.rstrip("/")
 
 
 def ns_to_s(value: object) -> float:
-    if not value:
-        return 0.0
-    return float(value) / 1_000_000_000
+    return float(value) / 1_000_000_000 if value else 0.0
 
 
 def compute_speed(count: object, duration_ns: object) -> float:
     duration_s = ns_to_s(duration_ns)
-    if not count or duration_s <= 0:
-        return 0.0
-    return float(count) / duration_s
+    return float(count) / duration_s if count and duration_s > 0 else 0.0
 
 
 def format_bytes(num_bytes: object) -> str | None:
-    if not num_bytes:
+    if num_bytes is None:
         return None
     size = float(num_bytes)
     units = ["B", "KB", "MB", "GB", "TB"]
@@ -81,12 +80,6 @@ def format_context_length(value: object) -> str | None:
         return str(value)
 
 
-def optional_str(value: object) -> str | None:
-    if value is None or value == "":
-        return None
-    return str(value)
-
-
 def build_model_info(selected_model: str | None, model_map: dict[str, dict[str, object]]) -> str:
     if not selected_model:
         return "### Selected Model\nNo model selected."
@@ -97,9 +90,9 @@ def build_model_info(selected_model: str | None, model_map: dict[str, dict[str, 
 
     details = model_meta.get("details", {})
     vram_size = format_bytes(model_meta.get("size_vram"))
-    family = optional_str(details.get("family"))
-    quantization = optional_str(details.get("quantization_level"))
-    param_size = optional_str(details.get("parameter_size"))
+    family = details.get("family")
+    quantization = details.get("quantization_level")
+    param_size = details.get("parameter_size")
     context_length = format_context_length(model_meta.get("context_length"))
 
     lines = [f"### {selected_model}"]
@@ -116,9 +109,7 @@ def build_model_info(selected_model: str | None, model_map: dict[str, dict[str, 
 
 
 def choose_model(model_names: list[str], preferred_model: str | None) -> str:
-    if preferred_model and preferred_model in model_names:
-        return preferred_model
-    return model_names[0]
+    return preferred_model if preferred_model in model_names else model_names[0]
 
 
 def fetch_models(normalized_base_url: str) -> list[dict[str, object]]:
@@ -183,11 +174,10 @@ def fetch_ps_entry(normalized_base_url: str, model: str) -> dict[str, object] | 
         return None
 
     models = payload.get("models", [])
-    for entry in models:
-        entry_name = entry.get("name") or entry.get("model") or ""
-        if entry_name == model:
-            return entry
-    return None
+    return next(
+        (entry for entry in models if (entry.get("name") or entry.get("model") or "") == model),
+        None,
+    )
 
 
 def render_assistant_text(text: str) -> str:
@@ -198,12 +188,12 @@ def render_assistant_text(text: str) -> str:
     #   ...math...
     # ]
     # Accepts indentation and both [ ... ] and \[ ... \] styles.
-    block_pattern = re.compile(r"(?ms)(^|\n)\s*\\?\[\s*\n(.*?)\n\s*\\?\]\s*(?=\n|$)")
-    rendered, _ = block_pattern.subn(lambda m: f"{m.group(1)}$$\n{m.group(2).strip()}\n$$", rendered)
+    rendered, _ = BLOCK_MATH_PATTERN.subn(
+        lambda m: f"{m.group(1)}$$\n{m.group(2).strip()}\n$$", rendered
+    )
 
     # Convert single-line bracket math like [h = \tfrac12,g,t^{2}.]
-    inline_pattern = re.compile(r"\[\s*([^\[\]\n]*[=\\^_][^\[\]\n]*)\s*\]")
-    rendered, _ = inline_pattern.subn(lambda m: f"$${m.group(1).strip()}$$", rendered)
+    rendered, _ = INLINE_MATH_PATTERN.subn(lambda m: f"$${m.group(1).strip()}$$", rendered)
 
     return rendered
 
@@ -222,11 +212,11 @@ def stream_chat(
     model_info = build_model_info(model, model_map)
 
     if not message.strip():
-        yield clean_ui, clean_ui, clean_api, header_text(STATUS_READY), "No metrics yet.", model_info, model_map
+        yield clean_ui, clean_ui, clean_api, header_text(STATUS_READY), NO_METRICS_TEXT, model_info, model_map
         return
 
     if not model:
-        yield clean_ui, clean_ui, clean_api, header_text(STATUS_READY), "No metrics yet.", model_info, model_map
+        yield clean_ui, clean_ui, clean_api, header_text(STATUS_READY), NO_METRICS_TEXT, model_info, model_map
         return
 
     normalized = normalize_base_url(base_url)
@@ -236,7 +226,15 @@ def stream_chat(
         {"role": "user", "content": message},
         {"role": "assistant", "content": ""},
     ]
-    yield display_history, display_history, clean_api, header_text(STATUS_GENERATING), "No metrics yet.", model_info, model_map
+    yield (
+        display_history,
+        display_history,
+        clean_api,
+        header_text(STATUS_GENERATING),
+        NO_METRICS_TEXT,
+        model_info,
+        model_map,
+    )
 
     payload = {
         "model": model,
@@ -245,7 +243,7 @@ def stream_chat(
     }
 
     text = ""
-    final_meta: dict[str, Any] = {}
+    final_meta: dict[str, object] = {}
     last_ui_emit = time.monotonic()
     last_ui_len = 0
     try:
@@ -278,14 +276,30 @@ def stream_chat(
                         display_history[-1] = {"role": "assistant", "content": text}
                         last_ui_emit = now
                         last_ui_len = len(text)
-                        yield display_history, display_history, clean_api, header_text(status_key), "No metrics yet.", model_info, model_map
+                        yield (
+                            display_history,
+                            display_history,
+                            clean_api,
+                            header_text(status_key),
+                            NO_METRICS_TEXT,
+                            model_info,
+                            model_map,
+                        )
 
                 if event.get("done"):
                     final_meta = event
                     break
     except (requests.RequestException, json.JSONDecodeError) as exc:
         display_history[-1] = {"role": "assistant", "content": f"[Error] {exc}"}
-        yield display_history, display_history, clean_api, header_text(STATUS_ERROR), "No metrics yet.", model_info, model_map
+        yield (
+            display_history,
+            display_history,
+            clean_api,
+            header_text(STATUS_ERROR),
+            NO_METRICS_TEXT,
+            model_info,
+            model_map,
+        )
         return
 
     metrics = format_metrics(final_meta) if final_meta else "No metrics returned by Ollama."
@@ -316,11 +330,9 @@ def build_app(
         ui_history_state = gr.State([])
         api_history_state = gr.State([])
 
-
         headline = gr.Markdown(header_text(STATUS_READY))
 
         with gr.Row():
-
             with gr.Column(scale=3, min_width=480):
                 with gr.Row(elem_classes=["prompt-row"]):
                     prompt = gr.Textbox(show_label=False, placeholder="Ask something...", scale=40)
@@ -349,27 +361,22 @@ def build_app(
             outputs=[model_info],
         )
 
-        prompt.submit(
-            fn=stream_chat,
-            inputs=[prompt, ui_history_state, api_history_state, ollama_base_url, model, model_map_state],
-            outputs=[chat, ui_history_state, api_history_state, headline, metrics, model_info, model_map_state],
-        ).then(
-            fn=lambda: "",
-            inputs=[],
-            outputs=[prompt],
-        )
-        send.click(
-            fn=stream_chat,
-            inputs=[prompt, ui_history_state, api_history_state, ollama_base_url, model, model_map_state],
-            outputs=[chat, ui_history_state, api_history_state, headline, metrics, model_info, model_map_state],
-        ).then(
-            fn=lambda: "",
-            inputs=[],
-            outputs=[prompt],
-        )
+        def bind_send(event):
+            event(
+                fn=stream_chat,
+                inputs=[prompt, ui_history_state, api_history_state, ollama_base_url, model, model_map_state],
+                outputs=[chat, ui_history_state, api_history_state, headline, metrics, model_info, model_map_state],
+            ).then(
+                fn=lambda: "",
+                inputs=[],
+                outputs=[prompt],
+            )
+
+        bind_send(prompt.submit)
+        bind_send(send.click)
 
         chat.clear(
-            fn=lambda mm: ([], [], [], header_text(STATUS_READY), "No metrics yet.", gr.update(), mm),
+            fn=lambda mm: ([], [], [], header_text(STATUS_READY), NO_METRICS_TEXT, gr.update(), mm),
             inputs=[model_map_state],
             outputs=[chat, ui_history_state, api_history_state, headline, metrics, model_info, model_map_state],
         )
