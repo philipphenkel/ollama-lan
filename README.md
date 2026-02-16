@@ -62,10 +62,11 @@ curl -fsSL https://raw.githubusercontent.com/philipphenkel/ollama-lan/main/scrip
 Customize with environment variables:
 
 ```bash
-OLLAMA_LAN_BASE_URL=http://192.168.1.20:11434 \
-OLLAMA_LAN_PORT=11440 \
-OLLAMA_LAN_MODEL=gpt-oss:20b \
-curl -fsSL https://raw.githubusercontent.com/philipphenkel/ollama-lan/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/philipphenkel/ollama-lan/main/scripts/install.sh | \
+  OLLAMA_LAN_BASE_URL=http://192.168.1.20:11434 \
+  OLLAMA_LAN_PORT=11440 \
+  OLLAMA_LAN_MODEL=gpt-oss:20b \
+  bash
 ```
 
 Uninstall:

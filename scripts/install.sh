@@ -45,10 +45,10 @@ OLLAMA_LAN_DIR="${OLLAMA_LAN_DIR:-/opt/ollama-lan}"
 OLLAMA_LAN_USER="${OLLAMA_LAN_USER:-${SUDO_USER:-$(id -un)}}"
 OLLAMA_LAN_GROUP="${OLLAMA_LAN_GROUP:-$OLLAMA_LAN_USER}"
 OLLAMA_LAN_HOST="${OLLAMA_LAN_HOST:-0.0.0.0}"
-OLLAMA_LAN_PORT="${OLLAMA_LAN_PORT:-11440}"
-OLLAMA_LAN_BASE_URL="${OLLAMA_LAN_BASE_URL:-http://localhost:11434}"
-OLLAMA_LAN_MODEL="${OLLAMA_LAN_MODEL:-}"
-OLLAMA_LAN_SHARE="${OLLAMA_LAN_SHARE:-false}"
+OLLAMA_LAN_PORT="${OLLAMA_LAN_PORT:-${OLLAMA_LAN_PORT:-11440}}"
+OLLAMA_LAN_BASE_URL="${OLLAMA_LAN_BASE_URL:-${OLLAMA_BASE_URL:-http://localhost:11434}}"
+OLLAMA_LAN_MODEL="${OLLAMA_LAN_MODEL:-${OLLAMA_MODEL:-}}"
+OLLAMA_LAN_SHARE="${OLLAMA_LAN_SHARE:-${OLLAMA_SHARE:-false}}"
 
 TMP_DIR="$(mktemp -d)"
 cleanup() {
@@ -93,15 +93,16 @@ if command -v systemctl >/dev/null 2>&1; then
     printf '"%s"' "$value"
   }
 
-  exec_line="ExecStart=${OLLAMA_LAN_DIR}/.venv/bin/python ${OLLAMA_LAN_DIR}/ollama-lan.py \\"
-  exec_line="${exec_line}\n  --host $(sd_quote "${OLLAMA_LAN_HOST}") \\"
-  exec_line="${exec_line}\n  --port $(sd_quote "${OLLAMA_LAN_PORT}") \\"
-  exec_line="${exec_line}\n  --ollama-base-url $(sd_quote "${OLLAMA_LAN_BASE_URL}")"
+  host_q="$(sd_quote "${OLLAMA_LAN_HOST}")"
+  port_q="$(sd_quote "${OLLAMA_LAN_PORT}")"
+  base_q="$(sd_quote "${OLLAMA_LAN_BASE_URL}")"
+  model_q=""
   if [ -n "${OLLAMA_LAN_MODEL:-}" ]; then
-    exec_line="${exec_line} \\\n  --model $(sd_quote "${OLLAMA_LAN_MODEL}")"
+    model_q="$(sd_quote "${OLLAMA_LAN_MODEL}")"
   fi
+  share_flag=""
   case "${OLLAMA_LAN_SHARE:-false}" in
-    1|true|TRUE|yes|YES) exec_line="${exec_line} \\\n  --share" ;;
+    1|true|TRUE|yes|YES) share_flag="--share" ;;
   esac
 
   cat <<EOF | $SUDO tee /etc/systemd/system/ollama-lan.service >/dev/null
@@ -115,7 +116,10 @@ Type=simple
 User=${OLLAMA_LAN_USER}
 Group=${OLLAMA_LAN_GROUP}
 WorkingDirectory=${OLLAMA_LAN_DIR}
-${exec_line}
+ExecStart=${OLLAMA_LAN_DIR}/.venv/bin/python ${OLLAMA_LAN_DIR}/ollama-lan.py \\
+  --host ${host_q} \\
+  --port ${port_q} \\
+  --ollama-base-url ${base_q}$( [ -n "${model_q}" ] && printf " \\\\\n  --model %s" "${model_q}" )$( [ -n "${share_flag}" ] && printf " \\\\\n  %s" "${share_flag}" )
 Restart=on-failure
 RestartSec=2
 
