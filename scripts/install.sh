@@ -104,8 +104,8 @@ if command -v systemctl >/dev/null 2>&1; then
   case "${OLLAMA_LAN_SHARE:-false}" in
     1|true|TRUE|yes|YES) share_flag="--share" ;;
   esac
-
-  cat <<EOF | $SUDO tee /etc/systemd/system/ollama-lan.service >/dev/null
+  {
+    cat <<EOF
 [Unit]
 Description=ollama-lan
 After=network-online.target
@@ -116,16 +116,30 @@ Type=simple
 User=${OLLAMA_LAN_USER}
 Group=${OLLAMA_LAN_GROUP}
 WorkingDirectory=${OLLAMA_LAN_DIR}
-ExecStart=${OLLAMA_LAN_DIR}/.venv/bin/python ${OLLAMA_LAN_DIR}/ollama-lan.py \\
-  --host ${host_q} \\
-  --port ${port_q} \\
-  --ollama-base-url ${base_q}$( [ -n "${model_q}" ] && printf " \\\\\n  --model %s" "${model_q}" )$( [ -n "${share_flag}" ] && printf " \\\\\n  %s" "${share_flag}" )
+EOF
+
+    printf 'ExecStart=%s %s \\\n' \
+      "${OLLAMA_LAN_DIR}/.venv/bin/python" \
+      "${OLLAMA_LAN_DIR}/ollama-lan.py"
+    printf '  --host %s \\\n' "${host_q}"
+    printf '  --port %s \\\n' "${port_q}"
+    printf '  --ollama-base-url %s' "${base_q}"
+    if [ -n "${model_q}" ]; then
+      printf ' \\\n  --model %s' "${model_q}"
+    fi
+    if [ -n "${share_flag}" ]; then
+      printf ' \\\n  --share'
+    fi
+    printf '\n'
+
+    cat <<EOF
 Restart=on-failure
 RestartSec=2
 
 [Install]
 WantedBy=multi-user.target
 EOF
+  } | $SUDO tee /etc/systemd/system/ollama-lan.service >/dev/null
 
   $SUDO systemctl daemon-reload
   $SUDO systemctl enable --now ollama-lan
