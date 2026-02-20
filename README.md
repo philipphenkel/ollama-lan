@@ -36,6 +36,9 @@ ollama list
 ## Quickstart
 
 ```bash
+git clone https://github.com/philipphenkel/ollama-lan.git
+cd ollama-lan
+
 python3 -m venv .venv
 source .venv/bin/activate
 
