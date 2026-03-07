@@ -30,7 +30,7 @@ STATUS_READY = "ready"
 STATUS_GENERATING = "gen"
 STATUS_THINKING = "think"
 STATUS_ERROR = "err"
-NO_METRICS_TEXT = "No metrics yet."
+NO_METRICS_TEXT = "No response metrics yet."
 
 STATUS_TEXT = {
     STATUS_READY: "🟢 Ready",
@@ -99,18 +99,53 @@ def build_model_info(selected_model: str | None, model_map: dict[str, dict[str, 
         return f"### Selected Model\n`{selected_model}` metadata unavailable."
 
     details = model_meta.get("details", {})
-    vram_size = format_bytes(model_meta.get("size_vram"))
+    # Raw byte values for calculations – keep None if not provided
+    size_bytes = model_meta.get("size")
+    vram_bytes = model_meta.get("size_vram")
+    ram_bytes = model_meta.get("size_ram")
+
+    # Human‑readable formatted sizes (only when data exists)
+    size = format_bytes(size_bytes) if size_bytes is not None else None
+    vram_size = format_bytes(vram_bytes) if vram_bytes is not None else None
+    ram_size = format_bytes(ram_bytes) if ram_bytes is not None else None
+
+    # Processor distribution logic – smarter handling per new spec.
+    # 1. size & vram present: calculate based on vram.
+    # 2. size present but neither vram nor ram: skip processor.
+    # 3. size & only ram present: assume 100% RAM (i.e., 100% CPU).
+    if size_bytes is None:
+        processor = None
+    elif vram_bytes is not None:
+        # Case 1: size and vram available (ignore ram if present)
+        if vram_bytes == 0:
+            processor = "100% CPU"
+        elif vram_bytes >= size_bytes:
+            processor = "100% GPU"
+        else:
+            gpu_pct = int(round(vram_bytes / size_bytes * 100))
+            cpu_pct = 100 - gpu_pct
+            processor = f"{cpu_pct}%/{gpu_pct}% CPU/GPU"
+    elif ram_bytes is not None:
+        # Case 3: only RAM present with size → assume 100% CPU
+        processor = "100% CPU"
+    else:
+        # Case 2: size present but no memory info
+        processor = None
+
     family = details.get("family")
     quantization = details.get("quantization_level")
-    param_size = details.get("parameter_size")
+    parameter_size = details.get("parameter_size")
     context_length = format_context_length(model_meta.get("context_length"))
 
     lines = [f"### {selected_model}"]
     for label, value in (
+        ("Processor", processor),
         ("Family", family),
-        ("Parameters", param_size),
+        ("Parameters", parameter_size),
+        ("Model size", size),
         ("Quantization", quantization),
-        ("VRAM size", vram_size),
+        ("VRAM usage", vram_size),
+        ("RAM usage", ram_size),
         ("Context length", context_length),
     ):
         if value is not None:
@@ -291,7 +326,7 @@ def stream_chat(
     ps_entry = fetch_ps_entry(normalized, model)
     if ps_entry:
         entry = dict(model_map.get(model) or {})
-        for key in ("context_length", "size_vram"):
+        for key in ("context_length", "size", "size_vram", "size_ram"):
             if ps_entry.get(key):
                 entry[key] = ps_entry.get(key)
         if entry:
