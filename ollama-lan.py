@@ -139,17 +139,27 @@ def build_model_info(selected_model: str | None, model_map: dict[str, dict[str, 
 
     lines = [f"### {selected_model}"]
     for label, value in (
-        ("Processor", processor),
         ("Family", family),
         ("Parameters", parameter_size),
-        ("Model size", size),
         ("Quantization", quantization),
-        ("VRAM usage", vram_size),
-        ("RAM usage", ram_size),
-        ("Context length", context_length),
     ):
         if value is not None:
             lines.append(f"- {label}: **{value}**")
+
+    runtime_items = []
+    if processor is not None:
+        runtime_items.append(f"- Processor: **{processor}**")
+    if vram_size is not None:
+        runtime_items.append(f"- VRAM usage: **{vram_size}**")
+    if ram_size is not None:
+        runtime_items.append(f"- RAM usage: **{ram_size}**")
+    if context_length is not None:
+        runtime_items.append(f"- Context length: **{context_length}**")
+
+    if runtime_items:
+        lines.append("\n### Runtime Status")
+        lines.extend(runtime_items)
+
     return "\n".join(lines)
 
 
