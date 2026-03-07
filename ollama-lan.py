@@ -4,11 +4,10 @@ import argparse
 import json
 import re
 import time
-
+import os
 import gradio as gr
 import requests
 
-import os
 
 os.environ["GRADIO_FLAGGING_MODE"] = "never"
 os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
@@ -99,24 +98,18 @@ def build_model_info(selected_model: str | None, model_map: dict[str, dict[str, 
         return f"### Selected Model\n`{selected_model}` metadata unavailable."
 
     details = model_meta.get("details", {})
-    # Raw byte values for calculations – keep None if not provided
+
     size_bytes = model_meta.get("size")
     vram_bytes = model_meta.get("size_vram")
     ram_bytes = model_meta.get("size_ram")
 
-    # Human‑readable formatted sizes (only when data exists)
     size = format_bytes(size_bytes) if size_bytes is not None else None
     vram_size = format_bytes(vram_bytes) if vram_bytes is not None else None
     ram_size = format_bytes(ram_bytes) if ram_bytes is not None else None
 
-    # Processor distribution logic – smarter handling per new spec.
-    # 1. size & vram present: calculate based on vram.
-    # 2. size present but neither vram nor ram: skip processor.
-    # 3. size & only ram present: assume 100% RAM (i.e., 100% CPU).
     if size_bytes is None:
         processor = None
     elif vram_bytes is not None:
-        # Case 1: size and vram available (ignore ram if present)
         if vram_bytes == 0:
             processor = "100% CPU"
         elif vram_bytes >= size_bytes:
@@ -126,10 +119,8 @@ def build_model_info(selected_model: str | None, model_map: dict[str, dict[str, 
             cpu_pct = 100 - gpu_pct
             processor = f"{cpu_pct}%/{gpu_pct}% CPU/GPU"
     elif ram_bytes is not None:
-        # Case 3: only RAM present with size → assume 100% CPU
         processor = "100% CPU"
     else:
-        # Case 2: size present but no memory info
         processor = None
 
     family = details.get("family")
@@ -238,16 +229,10 @@ def fetch_ps_entry(normalized_base_url: str, model: str) -> dict[str, object] | 
 def render_assistant_text(text: str) -> str:
     rendered = text.replace("\r\n", "\n").replace("\r", "\n")
 
-    # Convert multiline block math emitted as:
-    # [
-    #   ...math...
-    # ]
-    # Accepts indentation and both [ ... ] and \[ ... \] styles.
     rendered, _ = BLOCK_MATH_PATTERN.subn(
         lambda m: f"{m.group(1)}$$\n{m.group(2).strip()}\n$$", rendered
     )
 
-    # Convert single-line bracket math like [h = \tfrac12,g,t^{2}.]
     rendered, _ = INLINE_MATH_PATTERN.subn(lambda m: f"$${m.group(1).strip()}$$", rendered)
 
     return rendered
