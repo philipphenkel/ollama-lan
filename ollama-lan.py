@@ -30,7 +30,7 @@ STATUS_READY = "ready"
 STATUS_GENERATING = "gen"
 STATUS_THINKING = "think"
 STATUS_ERROR = "err"
-NO_METRICS_TEXT = "No response metrics yet."
+NO_METRICS_TEXT = ""
 
 STATUS_TEXT = {
     STATUS_READY: "🟢 Ready",
@@ -383,10 +383,14 @@ def build_app(
             inputs=[ollama_base_url_state, startup_model_state],
             outputs=[model, model_info, model_map_state, headline],
         )
+        # Reset metrics when the model changes
         model.change(
-            fn=lambda m, mm: build_model_info(m, mm or {}),
+            fn=lambda m, mm: (
+                build_model_info(m, mm or {}),
+                NO_METRICS_TEXT,
+            ),
             inputs=[model, model_map_state],
-            outputs=[model_info],
+            outputs=[model_info, metrics],
         )
 
         def bind_send(event):
