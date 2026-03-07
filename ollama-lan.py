@@ -9,13 +9,16 @@ import gradio as gr
 import requests
 
 
-os.environ["GRADIO_FLAGGING_MODE"] = "never"
-os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
-os.environ["GRADIO_CACHE_EXAMPLES"] = "false"
-os.environ["GRADIO_CHAT_FLAGGING_MODE"] = "never"
-os.environ["GRADIO_VIBE_MODE"] = ""
-os.environ["GRADIO_MCP_SERVER"] = "False"
-os.environ["GRADIO_SHARE"] = "False"
+for key, value in {
+    "GRADIO_FLAGGING_MODE": "never",
+    "GRADIO_ANALYTICS_ENABLED": "False",
+    "GRADIO_CACHE_EXAMPLES": "false",
+    "GRADIO_CHAT_FLAGGING_MODE": "never",
+    "GRADIO_VIBE_MODE": "",
+    "GRADIO_MCP_SERVER": "False",
+    "GRADIO_SHARE": "False",
+}.items():
+    os.environ[key] = value
 
 APP_TITLE = "ollama-lan"
 DEFAULT_BASE_URL = "http://localhost:11434"
@@ -89,6 +92,19 @@ def format_context_length(value: object) -> str | None:
         return str(value)
 
 
+def compute_processor(size_bytes: object, vram_bytes: object, ram_bytes: object) -> str | None:
+    if size_bytes is None:
+        return None
+    if vram_bytes is not None:
+        if vram_bytes == 0:
+            return "100% CPU"
+        if vram_bytes >= size_bytes:
+            return "100% GPU"
+        gpu_pct = int(round(vram_bytes / size_bytes * 100))
+        return f"{100 - gpu_pct}%/{gpu_pct}% CPU/GPU"
+    return "100% CPU" if ram_bytes is not None else None
+
+
 def build_model_info(selected_model: str | None, model_map: dict[str, dict[str, object]]) -> str:
     if not selected_model:
         return "### Selected Model\nNo model selected."
@@ -103,25 +119,8 @@ def build_model_info(selected_model: str | None, model_map: dict[str, dict[str, 
     vram_bytes = model_meta.get("size_vram")
     ram_bytes = model_meta.get("size_ram")
 
-    size = format_bytes(size_bytes) if size_bytes is not None else None
-    vram_size = format_bytes(vram_bytes) if vram_bytes is not None else None
-    ram_size = format_bytes(ram_bytes) if ram_bytes is not None else None
-
-    if size_bytes is None:
-        processor = None
-    elif vram_bytes is not None:
-        if vram_bytes == 0:
-            processor = "100% CPU"
-        elif vram_bytes >= size_bytes:
-            processor = "100% GPU"
-        else:
-            gpu_pct = int(round(vram_bytes / size_bytes * 100))
-            cpu_pct = 100 - gpu_pct
-            processor = f"{cpu_pct}%/{gpu_pct}% CPU/GPU"
-    elif ram_bytes is not None:
-        processor = "100% CPU"
-    else:
-        processor = None
+    _, vram_size, ram_size = (format_bytes(v) for v in (size_bytes, vram_bytes, ram_bytes))
+    processor = compute_processor(size_bytes, vram_bytes, ram_bytes)
 
     family = details.get("family")
     quantization = details.get("quantization_level")
@@ -171,27 +170,25 @@ def fetch_models(normalized_base_url: str) -> list[dict[str, object]]:
 
 
 def refresh_models(base_url: str, selected_model: str | None):
+    def response(choices, value, info, model_map, status):
+        return gr.update(choices=choices, value=value), info, model_map, header_text(status)
+
     normalized = normalize_base_url(base_url)
     try:
         models = fetch_models(normalized)
     except requests.RequestException as exc:
         info = f"### Selected Model\nUnavailable. Could not reach `{normalized}`.\n\n`{exc}`"
-        return gr.update(choices=[], value=None), info, {}, header_text(STATUS_ERROR)
+        return response([], None, info, {}, STATUS_ERROR)
 
     model_names = [model["name"] for model in models]
     model_map = {model["name"]: model for model in models}
 
     if not model_names:
-        return (
-            gr.update(choices=[], value=None),
-            "### Selected Model\nNo models found.",
-            {},
-            header_text(STATUS_READY),
-        )
+        return response([], None, "### Selected Model\nNo models found.", {}, STATUS_READY)
 
     value = choose_model(model_names, selected_model)
     info = build_model_info(value, model_map)
-    return gr.update(choices=model_names, value=value), info, model_map, header_text(STATUS_READY)
+    return response(model_names, value, info, model_map, STATUS_READY)
 
 
 def format_metrics(meta: dict[str, object]) -> str:
@@ -290,18 +287,20 @@ def stream_chat(
                     continue
                 event = json.loads(line)
                 message_event = event.get("message", {})
-                status_key = STATUS_THINKING if message_event.get("thinking") else STATUS_GENERATING
+                thinking = message_event.get("thinking")
+                chunk = message_event.get("content")
+                status_key = STATUS_THINKING if thinking else STATUS_GENERATING
 
-                if message_event.get("content"):
-                    text += message_event["content"]
+                if chunk:
+                    text += chunk
 
-                if message_event.get("thinking") or message_event.get("content"):
+                if thinking or chunk:
                     now = time.monotonic()
                     chars_delta = len(text) - last_ui_len
                     should_emit = (
                         chars_delta >= STREAM_UI_UPDATE_MIN_CHARS
                         or now - last_ui_emit >= STREAM_UI_UPDATE_INTERVAL_SECONDS
-                        or (message_event.get("thinking") and not message_event.get("content"))
+                        or (thinking and not chunk)
                     )
                     if should_emit:
                         display_history[-1] = {"role": "assistant", "content": text}
@@ -322,8 +321,9 @@ def stream_chat(
     if ps_entry:
         entry = dict(model_map.get(model) or {})
         for key in ("context_length", "size", "size_vram", "size_ram"):
-            if ps_entry.get(key):
-                entry[key] = ps_entry.get(key)
+            value = ps_entry.get(key)
+            if value is not None:
+                entry[key] = value
         if entry:
             model_map[model] = entry
             model_info = build_model_info(model, model_map)
@@ -405,16 +405,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=f"Run {APP_TITLE}.")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind Gradio server to.")
     parser.add_argument("--port", type=int, default=11440, help="Port to bind Gradio server to.")
-    parser.add_argument(
-        "--ollama-base-url",
-        default=DEFAULT_BASE_URL,
-        help="Ollama base URL (example: http://localhost:11434).",
-    )
-    parser.add_argument(
-        "--model",
-        default=None,
-        help="Model name to preselect at startup (example: gpt-oss:20b).",
-    )
+    parser.add_argument("--ollama-base-url", default=DEFAULT_BASE_URL, help="Ollama base URL (example: http://localhost:11434).")
+    parser.add_argument("--model", default=None, help="Model name to preselect at startup (example: gpt-oss:20b).")
     return parser.parse_args()
 
 
