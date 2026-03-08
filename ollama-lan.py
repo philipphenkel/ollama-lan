@@ -352,7 +352,7 @@ def build_app(
 
             with gr.Column(scale=1, min_width=280):
                 model = gr.Dropdown(
-                    label=f"Models at {normalize_base_url(base_url)}",
+                    label=f"Models",
                     choices=[],
                     value=None,
                     allow_custom_value=False,
