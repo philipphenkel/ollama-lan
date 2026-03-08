@@ -1,29 +1,30 @@
 # ollama-lan
 
-Run Ollama on one machine — use it from all your devices.
-Lightweight LAN chat UI to access your models from any device in your local network.
+Run Ollama on one machine and use it from any device on your local network.
 
-This is a minimal single-file Gradio UI for Ollama (~400 lines), designed to stay readable, hackable, and easy to embed into other setups.
+This is a minimal single-file Gradio UI for Ollama, designed to stay readable and easy to modify.
 
 ![screenshot](screenshot.png)
 
 Features:
 
 - Chat conversation UI
-- Model picker
-- Live generation status (thinking / generating / done)
-- Model metadata (VRAM, quantization, context length)
-- Performance metrics (tokens/sec, load time, duration)
+- Streaming responses
+- Model picker (loaded from `/api/tags`)
+- Live status header (`Ready`, `Generating`, `Thinking`, `Ollama unreachable`)
+- Model details (family, parameter size, quantization)
+- Runtime info (CPU/GPU split, VRAM usage, RAM usage, context length)
+- Response metrics (prompt tok/s, generation tok/s, total duration, load duration)
+- Chat controls: clear history, copy message, copy full chat
 
-No database. No backend framework. Just Python + Gradio + Ollama.
+No database. No backend framework. Just Python, Gradio, and Ollama.
 
 ---
 
 ## Requirements
 
 - Python **3.10+**
-- A running **Ollama** instance  
-  (default: `http://localhost:11434`)
+- A running **Ollama** instance (default: `http://localhost:11434`)
 
 Test your Ollama first:
 
@@ -69,11 +70,23 @@ Customize with environment variables:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/philipphenkel/ollama-lan/main/scripts/install.sh | \
+  OLLAMA_LAN_HOST=0.0.0.0 \
   OLLAMA_LAN_BASE_URL=http://192.168.1.20:11434 \
   OLLAMA_LAN_PORT=11440 \
   OLLAMA_LAN_MODEL=gpt-oss:20b \
   bash
 ```
+
+Supported installer variables:
+
+- `OLLAMA_LAN_REPO` (default: `https://github.com/philipphenkel/ollama-lan`)
+- `OLLAMA_LAN_REF` (default: `main`)
+- `OLLAMA_LAN_DIR` (default: `/opt/ollama-lan`)
+- `OLLAMA_LAN_USER` / `OLLAMA_LAN_GROUP` (default: invoking user)
+- `OLLAMA_LAN_HOST` (default: `0.0.0.0`)
+- `OLLAMA_LAN_PORT` (default: `11440`)
+- `OLLAMA_LAN_BASE_URL` (default: `http://localhost:11434`)
+- `OLLAMA_LAN_MODEL` (default: unset)
 
 Uninstall:
 
@@ -90,7 +103,7 @@ curl -fsSL https://raw.githubusercontent.com/philipphenkel/ollama-lan/main/scrip
 | `--host` | `0.0.0.0` | Web server bind address |
 | `--port` | `11440` | Web UI port |
 | `--ollama-base-url` | `http://localhost:11434` | Ollama API base URL |
-| `--model` | auto | Preselect model at startup |
+| `--model` | first available model | Preselect model at startup |
 
 ---
 
