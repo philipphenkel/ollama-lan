@@ -122,14 +122,12 @@ def build_model_info(selected_model: str | None, model_map: dict[str, dict[str, 
     _, vram_size, ram_size = (format_bytes(v) for v in (size_bytes, vram_bytes, ram_bytes))
     processor = compute_processor(size_bytes, vram_bytes, ram_bytes)
 
-    family = details.get("family")
     quantization = details.get("quantization_level")
     parameter_size = details.get("parameter_size")
     context_length = format_context_length(model_meta.get("context_length"))
 
     lines = [f"### {selected_model}"]
     for label, value in (
-        ("Family", family),
         ("Parameters", parameter_size),
         ("Quantization", quantization),
     ):
@@ -413,6 +411,7 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = parse_args()
     demo = build_app(base_url=args.ollama_base_url, model=args.model)
+    print(f"Listening on {args.host}:{args.port}")
     demo.launch(
         server_name=args.host,
         server_port=args.port,
